@@ -1,13 +1,22 @@
 import streamlit as st
 import os
 import requests
+import base64
 
-# Page config
-st.set_page_config(page_title="Image Captioning App", page_icon="🖼️", layout="centered")
-st.title("🖼️ Image Captioning App")
-st.write("Upload an image, and Groq API will describe it in detail.")
+# Page setup
+st.set_page_config(
+    page_title="🖼️ Pro Image Captioning",
+    page_icon="🖼️",
+    layout="centered"
+)
 
-# Load GROQ API key from environment variable
+st.title("🖼️ Professional Image Captioning App")
+st.markdown("""
+Upload an image, and Groq API will describe it in detail with multiple captions.  
+It also provides context about objects, scene, colors, and mood.  
+""")
+
+# Load API key
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     st.error("⚠️ GROQ_API_KEY not found. Please set it as an environment variable.")
@@ -16,26 +25,23 @@ if not GROQ_API_KEY:
 # Upload image
 uploaded_image = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"])
 
-# Function to call Groq API for image description
-def describe_image_groq(image_bytes):
+# Function to describe image using Groq
+def describe_image_groq(image_bytes, num_variations=3):
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    # Base64 encode the image for API input
-    import base64
     image_b64 = base64.b64encode(image_bytes).decode('utf-8')
 
     prompt = f"""
-You are an AI assistant. Describe the content of the image provided in base64 below in a detailed, descriptive, and informative way. 
-Include objects, actions, scene, colors, and mood if applicable. Do not hallucinate.  
+You are an expert AI assistant. Given the image in base64 below, provide {num_variations} detailed, descriptive captions.  
+Include objects, scene, actions, colors, and mood if applicable. Make each caption unique.  
 
 Image (base64):
 {image_b64}
 """
-
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
@@ -52,12 +58,12 @@ Image (base64):
     else:
         return f"⚠️ Groq API Error: {response.status_code} - {response.text}"
 
-# Analyze the uploaded image
+# Display image preview and analyze button
 if uploaded_image:
     st.image(uploaded_image, caption="Uploaded Image", use_column_width=True)
-    if st.button("Describe Image"):
-        with st.spinner("Generating description with Groq..."):
+    if st.button("Generate Descriptions"):
+        with st.spinner("Generating captions with Groq..."):
             image_bytes = uploaded_image.read()
-            description = describe_image_groq(image_bytes)
-        st.subheader("Image Description")
-        st.write(description)
+            descriptions = describe_image_groq(image_bytes)
+        st.subheader("Generated Captions")
+        st.markdown(descriptions)
