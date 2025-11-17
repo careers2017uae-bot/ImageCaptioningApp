@@ -16,7 +16,8 @@ HF_API_KEY = st.secrets.get("HF_API_KEY")
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
 
 # Hugging Face API endpoint for BLIP-2
-HF_API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
+HF_API_URL = "https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning"
+
 
 def generate_caption_hf(image):
     buffered = BytesIO()
