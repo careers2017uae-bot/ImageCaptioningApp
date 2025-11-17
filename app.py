@@ -9,19 +9,19 @@ import requests
 # Streamlit Page Setup
 # ---------------------------
 st.set_page_config(
-    page_title="Image Captioning App",
+    page_title="🖼️ Image Captioning App",
     page_icon="🖼️",
     layout="centered"
 )
 
-st.title("🖼️ Image Captioning App by Engr. Bilal")
+st.title("🖼️ Image Captioning App with BLIP-2 + Optional LLM Enhancement")
 st.markdown("""
-Upload an image and get a descriptive caption.  
-You can optionally refine the caption using `llama-3.3-70b-versatile` via Groq API.
+Upload an image and get an **accurate caption**.  
+Optionally, enhance the caption using `llama-3.3-70b-versatile` via Groq API for more vivid descriptions.
 """)
 
 # ---------------------------
-# BLIP-2 Model Initialization
+# Load BLIP-2 Model
 # ---------------------------
 @st.cache_resource(show_spinner=True)
 def load_blip_model():
@@ -42,7 +42,6 @@ if not GROQ_API_KEY:
 # File Upload
 # ---------------------------
 uploaded_image = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"])
-
 enhance_with_llm = st.checkbox("Enhance caption with llama-3.3-70b-versatile", value=False)
 
 # ---------------------------
@@ -58,6 +57,9 @@ def generate_blip_caption(image):
 # LLM Enhancement Function
 # ---------------------------
 def enhance_caption_llm(caption_text):
+    if not GROQ_API_KEY:
+        return "⚠️ Cannot enhance: GROQ_API_KEY not set."
+    
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -65,8 +67,8 @@ def enhance_caption_llm(caption_text):
     }
 
     prompt = f"""
-You are an expert AI assistant. Refine and enhance the following image caption to be more detailed, vivid, and descriptive.  
-Keep the original meaning but enrich the objects, scene, colors, mood, and context.
+You are an expert AI assistant. Refine and enhance the following image caption to be more vivid, detailed, and descriptive.  
+Keep the original meaning but enrich objects, scene, colors, and mood.
 
 Caption:
 \"\"\"{caption_text}\"\"\"
@@ -92,7 +94,7 @@ Caption:
 # Main Processing
 # ---------------------------
 if uploaded_image:
-    image = Image.open(uploaded_image)
+    image = Image.open(uploaded_image).convert("RGB")
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
     if st.button("Generate Caption"):
@@ -101,12 +103,8 @@ if uploaded_image:
         st.subheader("BLIP-2 Caption")
         st.write(f"📝 {blip_caption}")
 
-        # Optional LLM Enhancement
         if enhance_with_llm:
-            if not GROQ_API_KEY:
-                st.warning("⚠️ Cannot enhance caption: GROQ_API_KEY not set.")
-            else:
-                with st.spinner("Enhancing caption with llama-3.3-70b-versatile..."):
-                    enhanced_caption = enhance_caption_llm(blip_caption)
-                st.subheader("Enhanced Caption")
-                st.write(f"✨ {enhanced_caption}")
+            with st.spinner("Enhancing caption with llama-3.3-70b-versatile..."):
+                enhanced_caption = enhance_caption_llm(blip_caption)
+            st.subheader("Enhanced Caption")
+            st.write(f"✨ {enhanced_caption}")
