@@ -5,12 +5,12 @@ import base64
 
 # Page setup
 st.set_page_config(
-    page_title="🖼️ Pro Image Captioning",
+    page_title="Pro Image Captioning",
     page_icon="🖼️",
     layout="centered"
 )
 
-st.title("🖼️ Professional Image Captioning App")
+st.title("🖼️ Professional Image Captioning App by Engr. Bilal")
 st.markdown("""
 Upload an image, and Groq API will describe it in detail with multiple captions.  
 It also provides context about objects, scene, colors, and mood.  
