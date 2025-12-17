@@ -1,4 +1,8 @@
-streamlit
-pandas
-groq
-reportlab
+streamlit>=1.32.0
+
+pandas>=2.0.0
+numpy>=1.24.0
+
+groq>=0.9.0
+
+reportlab>=4.0.0
