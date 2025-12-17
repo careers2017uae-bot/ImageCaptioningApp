@@ -1,106 +1,139 @@
 import streamlit as st
-from PIL import Image
+import os, time, uuid
+import pandas as pd
+from datetime import datetime
 from io import BytesIO
-import requests
-import os
+from groq import Groq
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
 
-# ---------------------------
-# Streamlit Page Setup
-# ---------------------------
-st.set_page_config(
-    page_title="🖼️ Image Captioning App",
-    page_icon="🖼️",
-    layout="centered"
-)
+st.set_page_config(page_title="AI Learning Intelligence Platform", layout="wide")
 
-st.title("🖼️ Image Captioning App")
-st.markdown("""
-Upload any image and get an **accurate caption**.  
-Optionally, enhance the caption with **llama-3.3-70b-versatile** via Groq API for more vivid descriptions.
-""")
+CSS = """
 
-# ---------------------------
-# API Keys from Streamlit Secrets
-# ---------------------------
-HF_API_KEY = st.secrets.get("HF_API_KEY")
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
+<style> .card{background:#ffffff;border-radius:14px;padding:16px;box-shadow:0 8px 18px rgba(0,0,0,.08);transition:.3s} .card:hover{transform:translateY(-6px);box-shadow:0 14px 30px rgba(0,0,0,.15)} </style>
 
-if not HF_API_KEY:
-    st.warning("⚠️ Hugging Face API key not set. App will not generate captions.")
-
-# ---------------------------
-# File Uploader
-# ---------------------------
-uploaded_file = st.file_uploader("Upload an image", type=["png", "jpg", "jpeg"])
-enhance_with_llm = st.checkbox("Enhance caption with LLaMA (via Groq)", value=False)
-
-# ---------------------------
-# Hugging Face Caption Function
-# ---------------------------
-HF_API_URL = "https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning"
-
-def generate_caption_hf(image):
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_bytes = buffered.getvalue()
-    
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"}
-    response = requests.post(HF_API_URL, headers=headers, files={"file": img_bytes})
-    
-    if response.status_code == 200:
-        return response.json()[0]['generated_text']
-    else:
-        return f"⚠️ Hugging Face API Error: {response.status_code} - {response.text}"
-
-# ---------------------------
-# Groq LLaMA Enhancement Function
-# ---------------------------
-def enhance_caption_llm(caption_text):
-    if not GROQ_API_KEY:
-        return "⚠️ GROQ_API_KEY not set."
-    
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    prompt = f"""
-Refine and enhance the following image caption to be more vivid, detailed, and descriptive.  
-Keep the meaning but enrich objects, scene, colors, and mood.
-
-Caption:
-\"\"\"{caption_text}\"\"\"
 """
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7
-    }
-    
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        try:
-            return response.json()['choices'][0]['message']['content']
-        except:
-            return "⚠️ Error parsing Groq response."
-    else:
-        return f"⚠️ Groq API Error: {response.status_code} - {response.text}"
+st.markdown(CSS, unsafe_allow_html=True)
 
-# ---------------------------
-# Main App Logic
-# ---------------------------
-if uploaded_file:
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded Image", use_column_width=True)
-    
-    if st.button("Generate Caption"):
-        with st.spinner("Generating caption..."):
-            caption = generate_caption_hf(image)
-        st.subheader("Caption from Hugging Face")
-        st.write(f"📝 {caption}")
-        
-        if enhance_with_llm:
-            with st.spinner("Enhancing caption with LLaMA..."):
-                enhanced_caption = enhance_caption_llm(caption)
-            st.subheader("Enhanced Caption")
-            st.write(f"✨ {enhanced_caption}")
+def groq_client():
+key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+if not key:
+st.error("Groq API key missing")
+st.stop()
+return Groq(api_key=key)
+
+def llm(prompt):
+c = groq_client()
+r = c.chat.completions.create(
+model="llama3-70b-8192",
+messages=[{"role":"user","content":prompt}],
+temperature=0.4
+)
+return r.choices[0].message.content
+
+def init_state():
+defaults = {
+"events": [],
+"xp": 0,
+"attempts": 0,
+"correct": 0,
+"start": time.time(),
+"student_id": str(uuid.uuid4())[:8]
+}
+for k,v in defaults.items():
+if k not in st.session_state:
+st.session_state[k]=v
+
+init_state()
+
+def log_event(data):
+st.session_state.events.append({"time":time.time(),**data})
+
+def analytics_df():
+return pd.DataFrame(st.session_state.events)
+
+def pdf_report(title, text):
+buf = BytesIO()
+doc = SimpleDocTemplate(buf)
+styles = getSampleStyleSheet()
+story=[Paragraph(title,styles["Title"]),Spacer(1,12)]
+for line in text.split("\n"):
+story.append(Paragraph(line,styles["Normal"]))
+story.append(Spacer(1,8))
+doc.build(story)
+buf.seek(0)
+return buf
+
+st.sidebar.title("Role")
+role = st.sidebar.radio("Select",["Student","Teacher","School Admin"])
+
+if role=="Student":
+st.header("🎮 Student Learning Game")
+grade = st.selectbox("Grade Level",["Primary","Secondary","Higher"])
+mode = st.selectbox("Learning Mode",["🎮 Fun","🎯 Exam-oriented","🧠 Concept mastery"])
+content = st.text_area("Paste learning content",height=180)
+if st.button("Generate Game"):
+    if not content:
+        st.error("Content required")
+    else:
+        concepts = llm(f"Extract 5 key concepts from:\n{content}").split("\n")
+        st.session_state["concepts"]=concepts
+
+tabs = st.tabs(["🎮 Game","📊 My Analytics","🧠 AI Feedback"])
+
+with tabs[0]:
+    for c in st.session_state.get("concepts",[]):
+        q = llm(f"Create one MCQ question on {c} and provide correct answer at end prefixed by ANSWER:")
+        parts=q.split("ANSWER:")
+        st.markdown(f"<div class='card'><b>{c}</b><br>{parts[0]}</div>",unsafe_allow_html=True)
+        ans=st.text_input("Answer",key=c)
+        if st.button("Submit",key=c+"b"):
+            st.session_state.attempts+=1
+            if parts[1].strip().lower() in ans.lower():
+                st.success("Correct")
+                st.session_state.correct+=1
+                st.session_state.xp+=10
+                log_event({"concept":c,"correct":1})
+            else:
+                st.error("Incorrect")
+                log_event({"concept":c,"correct":0})
+
+with tabs[1]:
+    df=analytics_df()
+    if not df.empty:
+        st.metric("XP",st.session_state.xp)
+        st.metric("Accuracy",f"{(st.session_state.correct/max(1,st.session_state.attempts))*100:.1f}%")
+        st.bar_chart(df["concept"].value_counts())
+        st.line_chart(df["correct"])
+
+with tabs[2]:
+    fb=llm(f"Give encouraging learning feedback based on: {st.session_state.events}")
+    st.write(fb)
+elif role=="Teacher":
+st.header("📊 Teacher Analytics Dashboard")
+df=analytics_df()
+if df.empty:
+st.info("No data yet")
+else:
+st.subheader("Concept Accuracy")
+st.bar_chart(df.groupby("concept")["correct"].mean())
+st.subheader("Engagement")
+st.line_chart(df["correct"])
+insight=llm(f"Provide teacher insights from analytics: {df.to_dict()}")
+st.write(insight)
+st.download_button("Download CSV",df.to_csv(index=False),"class_analytics.csv")
+
+elif role=="School Admin":
+st.header("🏫 School Admin Dashboard")
+df=analytics_df()
+if df.empty:
+st.info("No platform data")
+else:
+st.metric("Active Students",1)
+st.metric("Total Attempts",len(df))
+st.area_chart(df["correct"])
+insight=llm(f"Provide admin-level insights and curriculum gaps from: {df.to_dict()}")
+st.write(insight)
+pdf=pdf_report("School Analytics Report",insight)
+st.download_button("Download PDF",pdf,"school_report.pdf")
